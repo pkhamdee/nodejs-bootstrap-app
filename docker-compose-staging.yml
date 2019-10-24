@@ -1,0 +1,48 @@
+version: '3'
+services:
+  nginx:
+    container_name: server
+    build: ./nginx
+    ports:
+      - "8002:8002"
+    depends_on:
+      - web
+    networks:
+      - app-ws
+    stdin_open: true
+    tty: true
+  database:
+    container_name: db
+    image: postgres:11.4
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: smart_dms
+      TZ: "Asia/Manila"
+      PGTZ: "Asia/Manila"
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./db:/var/lib/postgresql/data
+    networks:
+      - app-ws
+  web:
+    container_name: app
+    build: .
+    environment:
+      NODE_ENV: staging
+      TZ: "Asia/Manila"
+    volumes:
+      - ./project:/app
+      - /app/node_modules
+      - ./project/tmp:/app/tmp
+    networks:
+      - app-ws
+    stdin_open: true
+    tty: true
+    depends_on:
+      - database
+networks:
+  app-ws:
+    driver: bridge
