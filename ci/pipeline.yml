@@ -101,7 +101,7 @@ jobs:
       - get: dependency-cache
         passed: [install-dependencies]
       - task: run the test suite
-        file: repo-src/ci/tasks/run_test.yml     
+        file: repo-src/ci/tasks/run_tests.yml     
         on_failure:
           put: slack-alert
           params:
