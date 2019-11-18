@@ -1,21 +1,31 @@
-# Sample NodeJS App
+# Adonis fullstack application
 
-# Docker locally
+This is the fullstack boilerplate for AdonisJs, it comes pre-configured with.
 
+1. Bodyparser
+2. Session
+3. Authentication
+4. Web security middleware
+5. CORS
+6. Edge template engine
+7. Lucid ORM
+8. Migrations and seeds
+
+## Setup
+
+Use the adonis command to install the blueprint
+
+```bash
+adonis new yardstick
 ```
-docker-compose up -d --build
+
+or manually clone the repo and then run `npm install`.
+
+
+### Migrations
+
+Run the following command to run startup migrations.
+
+```js
+adonis migration:run
 ```
-
-Open your browser on: [http://localhost:3331](http://localhost:3331)
-
-# Docker staging
-
-```
-docker-compose -f docker-compose-staging.yml up -d --build
-```
-
-Create a load balancer that will listen to port `:8002` upstream
-
-# Docker production
-
-Different approach

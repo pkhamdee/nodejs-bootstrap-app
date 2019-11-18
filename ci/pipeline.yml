@@ -1,0 +1,275 @@
+---
+params:
+  git: &GIT_PARAMS
+    GIT_EMAIL: ((git-email))
+    GIT_NAME: ((git-name))
+    SRC_BRANCH: develop
+  slack_on_success_params: &SLACK_SUCCESS
+    channel: '#none'
+    username: 'webhookbot'
+    icon_emoji: ':concourse:'
+    silent: true
+    text: |
+      <!here> :white_check_mark: *$BUILD_PIPELINE_NAME/$BUILD_JOB_NAME* succeeded with build <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|$BUILD_NAME>!
+  slack_on_failure_params: &SLACK_FAILURE
+    channel: '#none'
+    username: 'webhookbot'
+    icon_emoji: ':concourse:'
+    silent: true
+    text: |
+      <!here> :rotating_light: *$BUILD_PIPELINE_NAME/$BUILD_JOB_NAME* failed with build <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|$BUILD_NAME>!
+
+resource_types:
+  - name: slack-notification
+    type: docker-image
+    source:
+      repository: cfcommunity/slack-notification-resource
+      tag: v1.5.0
+
+  - name: npm-cache
+    type: docker-image
+    source:
+      repository: ymedlop/npm-cache-resource
+      tag: latest
+
+  - name: kubernetes
+    type: docker-image
+    source:
+      repository: zlabjp/kubernetes-resource
+      tag: "latest"    
+
+resources:
+  - name: repo-develop
+    type: git
+    check_every: 5s
+    source: &repo-source
+      uri: https://github.com/pkhamdee/nodejs-bootstrap-app.git
+      username: ((git-username))
+      password: ((git-password))
+      branch: develop
+      ignore_paths:
+      - ci/*
+
+  - name: slack-alert
+    icon: slack
+    type: slack-notification
+    source:
+      url: {{slack-webhook-url}}
+
+  - name: dependency-cache
+    type: npm-cache
+    source:
+      <<: *repo-source
+      paths:
+        - package.json
+
+  - name: k8s-develop
+    type: kubernetes
+    source:
+      kubeconfig: {{kubeconfig-develop}} 
+
+  - name: harbor-image
+    type: docker-image
+    source:
+      username: {{harbor_username}}
+      password: {{harbor_password}}
+      repository: {{harbor_repository}}
+      insecure_registries:
+        - {{harbor_insecure_registry}}
+      ca_certs:
+        - domain: harbor.pcfgcp.pkhamdee.com:443
+          cert: {{harbor_cert}}           
+
+docker-params: &docker-params
+  tag: repo-src/.git/HEAD
+  tag_as_latest: true
+  cache: true
+  cache_tag: latest
+
+jobs:
+  - name: install-dependencies
+    plan:
+      - get: repo-src
+        resource: repo-develop
+        trigger: true
+      - get: dependency-cache
+
+  - name: run-test-develop
+    plan:
+      - get: repo-src
+        resource: repo-develop
+        trigger: true
+        passed: [install-dependencies]
+      - get: dependency-cache
+        passed: [install-dependencies]
+      - task: run the test suite
+        file: repo-src/ci/tasks/run_tests.yml     
+        on_failure:
+          put: slack-alert
+          params:
+            <<: *SLACK_FAILURE
+        on_success:
+          put: slack-alert
+          params:
+            <<: *SLACK_SUCCESS
+
+  - name: build-docker-image
+    plan:
+      - get: repo-src
+        resource: repo-develop
+        trigger: true
+        passed: [run-test-develop] 
+      - put: harbor-image
+        params:
+          <<: *docker-params
+          build: repo-src
+        on_failure:
+          put: slack-alert
+          params:
+            <<: *SLACK_FAILURE
+        on_success:
+          put: slack-alert
+          params:
+            <<: *SLACK_SUCCESS  
+
+  - name: deploy-k8s-develop
+    plan:
+      - get: harbor-image
+        trigger: true
+        passed: [build-docker-image]
+      - get: repo-src
+        resource: repo-develop
+        passed: [build-docker-image]  
+      - task: update-k8s-manifest
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+          inputs:
+          - name: repo-src
+          - name: harbor-image
+          outputs:
+          - name: updated
+          run:
+            path: bash
+            args:
+            - -c
+            - |
+              set -e
+              HEADID=`cat repo-src/.git/HEAD`
+              sed "s|:latest|:${HEADID}|g" repo-src/k8s/app-nodejs.yml | \
+              sed "s|FIXME|Bump to ${HEADID}|g" | \
+              sed "s|app-nodejs-namespace|app-nodejs-dev|g" > updated/app-nodejs.yml  
+
+      - put: k8s-develop
+        params:
+          kubectl: apply -f updated/app-nodejs.yml
+          wait_until_ready: 120
+          wait_until_ready_selector: app=web
+        on_failure:
+          put: slack-alert
+          params:
+            <<: *SLACK_FAILURE
+        on_success:
+          put: slack-alert
+          params:
+            <<: *SLACK_SUCCESS     
+
+  - name: load-test-develop
+    plan:
+    - get: repo-src
+      resource: repo-develop
+      trigger: true
+      passed:
+        - deploy-k8s-develop
+    - task: wrk
+      params:
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: skandyla/wrk
+        run:
+          path: sh
+          args:
+            - -c
+            - |
+              sleep 120
+              wrk -t16 -c200 -d30s --timeout 10s http://app-nodejs-dev.dev1.pcfgcp.pkhamdee.com --latency
+      on_failure:
+        put: slack-alert
+        params:
+          <<: *SLACK_FAILURE
+      on_success:
+        put: slack-alert
+        params:
+          <<: *SLACK_SUCCESS   
+
+  - name: integration-test
+    plan:
+    - get: repo-src
+      resource: repo-develop
+      trigger: true
+      passed:
+        - deploy-k8s-develop
+    - task: run integration test
+      params:
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: maven
+        run:
+          path: bash
+          args:
+            - -c
+            - |
+              echo "run integration test ..."
+      on_failure:
+        put: slack-alert
+        params:
+          <<: *SLACK_FAILURE
+      on_success:
+        put: slack-alert
+        params:
+          <<: *SLACK_SUCCESS
+
+  - name: automate-test
+    plan:
+    - get: repo-src
+      resource: repo-develop
+      trigger: true
+      passed:
+        - deploy-k8s-develop
+    - task: run automate test
+      params:
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: maven
+        run:
+          path: bash
+          args:
+            - -c
+            - |
+              echo "run automate test ..."
+      on_failure:
+        put: slack-alert
+        params:
+          <<: *SLACK_FAILURE
+      on_success:
+        put: slack-alert
+        params:
+          <<: *SLACK_SUCCESS        
+
+
+
+
+
+         
