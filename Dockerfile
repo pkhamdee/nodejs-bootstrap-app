@@ -2,15 +2,15 @@ FROM node:8.15-jessie
 
 ENV HOST 0.0.0.0
 
-WORKDIR ./project /app
+WORKDIR  /app
 
-COPY ./project/package*.json ./
+COPY package*.json ./
 
 RUN npm i -g @adonisjs/cli && \
     npm i -g pm2 && \
     npm i --quiet --production
 
-COPY ./project .
+COPY . .
 
 EXPOSE 3331
 
