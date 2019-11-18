@@ -47,8 +47,6 @@ resources:
       username: ((git-username))
       password: ((git-password))
       branch: develop
-      ignore_paths:
-      - ci/*
 
   - name: slack-alert
     icon: slack

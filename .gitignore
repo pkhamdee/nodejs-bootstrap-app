@@ -1,4 +1,5 @@
-ci/*
+ci/ca.crt
+ci/credentials.yml
 node_modules
 
 .vscode
