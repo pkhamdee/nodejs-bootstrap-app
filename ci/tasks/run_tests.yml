@@ -12,4 +12,4 @@ inputs:
   - name: dependency-cache
 
 run:
-  path: repo-src/project/ci/scripts/run_tests.sh
+  path: repo-src/ci/scripts/run_tests.sh
