@@ -1,0 +1,12 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: web-ingress
+spec:
+  rules:
+  - host: nodejs.dev1.pcfgcp.pkhamdee.com
+    http:
+      paths:
+      - backend:
+          serviceName: web-svc
+          servicePort: 3331

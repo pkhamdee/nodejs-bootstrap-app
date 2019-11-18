@@ -1,0 +1,21 @@
+version: '3'
+services:
+  web:
+    container_name: app
+    build: .
+    environment:
+      NODE_ENV: production
+      TZ: "Asia/Manila"
+    volumes:
+      - ./project:/app
+      - /app/node_modules
+      - ./project/tmp:/app/tmp
+    networks:
+      - app-ws
+    stdin_open: true
+    tty: true
+    ports:
+      - "3331:3331"
+networks:
+  app-ws:
+    driver: bridge

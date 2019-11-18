@@ -1,0 +1,43 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web-deployment
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - env:
+        - name: NODE_ENV
+          value: production
+        - name: TZ
+          value: Asia/Manila
+        image: harbor.pcfgcp.pkhamdee.com/library/nodejs-app:latest
+        name: nodejs-app
+        ports:
+        - containerPort: 3331
+        resources: {}
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /app
+          name: web-claim0
+        - mountPath: /app/node_modules
+          name: web-claim1
+        - mountPath: /app/tmp
+          name: web-claim2
+      restartPolicy: Always
+      volumes:
+      - name: web-claim0
+        emptyDir: {} 
+      - name: web-claim1
+        emptyDir: {} 
+      - name: web-claim2
+        emptyDir: {}

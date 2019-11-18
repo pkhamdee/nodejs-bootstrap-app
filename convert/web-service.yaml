@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: web
+  name: web-svc
+spec:
+  ports:
+  - name: http
+    port: 3331
+    targetPort: 3331
+  selector:
+    app: web

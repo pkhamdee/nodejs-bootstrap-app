@@ -1,0 +1,53 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: ./kompose convert --controller deployment --volumes persistentVolumeClaim
+      --chart
+    kompose.version: 1.16.0 (0c01309)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: web
+  name: web
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: web
+    spec:
+      containers:
+      - env:
+        - name: NODE_ENV
+          value: production
+        - name: TZ
+          value: Asia/Manila
+        image: web
+        name: app
+        ports:
+        - containerPort: 3331
+        resources: {}
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /app
+          name: web-claim0
+        - mountPath: /app/node_modules
+          name: web-claim1
+        - mountPath: /app/tmp
+          name: web-claim2
+      restartPolicy: Always
+      volumes:
+      - name: web-claim0
+        persistentVolumeClaim:
+          claimName: web-claim0
+      - name: web-claim1
+        persistentVolumeClaim:
+          claimName: web-claim1
+      - name: web-claim2
+        persistentVolumeClaim:
+          claimName: web-claim2
+status: {}

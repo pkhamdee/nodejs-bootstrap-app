@@ -1,5 +1,7 @@
 FROM node:8.15-jessie
 
+ENV HOST 0.0.0.0
+
 WORKDIR ./project /app
 
 COPY ./project/package*.json ./

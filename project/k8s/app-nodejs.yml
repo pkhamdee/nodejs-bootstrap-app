@@ -1,0 +1,90 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: app-nodejs-namespace
+
+---   
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: web-ingress
+  namespace: app-nodejs-namespace
+  labels:
+    app: web
+spec:
+  rules:
+  - host: app-nodejs-namespace.dev1.pcfgcp.pkhamdee.com
+    http:
+      paths:
+      - backend:
+          serviceName: web-svc
+          servicePort: 3331
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: web
+  name: web-svc
+  namespace: app-nodejs-namespace
+  labels:
+    app: web
+spec:
+  ports:
+  - name: http
+    port: 3331
+    targetPort: 3331
+  selector:
+    app: web
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web-deployment
+  namespace: app-nodejs-namespace
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: web
+      annotations:
+        kubernetes.io/change-cause: "FIXME"  
+    spec:
+      containers:
+      - env:
+        - name: NODE_ENV
+          value: production
+        - name: TZ
+          value: Asia/Manila
+        image: harbor.pcfgcp.pkhamdee.com/library/app-nodejs:latest
+        name: app-nodejs
+        ports:
+        - containerPort: 3331
+        resources: {}
+        stdin: true
+        tty: true
+        volumeMounts:
+        - mountPath: /app
+          name: web-claim0
+        - mountPath: /app/node_modules
+          name: web-claim1
+        - mountPath: /app/tmp
+          name: web-claim2
+      restartPolicy: Always
+      volumes:
+      - name: web-claim0
+        emptyDir: {} 
+      - name: web-claim1
+        emptyDir: {} 
+      - name: web-claim2
+        emptyDir: {}
